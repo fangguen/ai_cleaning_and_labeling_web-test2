@@ -1,0 +1,455 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI数据处理工具</title>
+    <link rel="shortcut icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
+    <link href="{% static 'css/bootstrap.min.css' %}" rel="stylesheet">
+    <link href="{% static 'css/all.min.css' %}" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f8f9fa;
+        }
+
+        .navbar {
+            box-shadow: 0 2px 4px rgba(0, 0, 0, .1);
+        }
+
+        .navbar-brand {
+            font-weight: bold;
+            color: #007bff !important;
+        }
+
+        #editor {
+            border: 1px solid #ced4da;
+            border-radius: .25rem;
+        }
+
+        #toolPanel {
+            background-color: #ffffff;
+            border: 1px solid #ced4da;
+            border-radius: .25rem;
+            padding: 15px;
+            height: 600px;
+            overflow-y: auto;
+        }
+
+        #aiChatWindow {
+            box-shadow: 0 0 10px rgba(0, 0, 0, .1);
+            transition: all 0.3s ease;
+        }
+
+        #chatHistory {
+            font-size: 0.9rem;
+        }
+
+        .chat-message {
+            margin-bottom: 10px;
+            padding: 5px 10px;
+            border-radius: 10px;
+        }
+
+        .user-message {
+            background-color: #007bff;
+            color: white;
+            align-self: flex-end;
+        }
+
+        .ai-message {
+            background-color: #f1f3f5;
+            color: #333;
+            align-self: flex-start;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loader" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 9999;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    </div>
+{% csrf_token %}
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="#"><i class="fas fa-robot"></i> AI数据处理工具</a>
+        <div>
+            <button class="btn btn-outline-primary me-2" id="importBtn"><i class="fas fa-file-import"></i> 导入文件
+            </button>
+            <button class="btn btn-outline-success me-2" id="exportBtn"><i class="fas fa-file-export"></i> 导出文件
+            </button>
+            <button class="btn btn-outline-info" id="helpBtn"><i class="fas fa-question-circle"></i> 使用说明</button>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid mt-3">
+    <div class="row">
+        <div class="col-md-8">
+            <div id="editor" style="height: 600px;"></div>
+        </div>
+        <div class="col-md-4">
+            <div id="toolPanel">
+                <h5>数据处理工具</h5>
+                <button class="btn btn-primary mb-2" onclick="aiDataCleaning()">AI数据清洗</button>
+                <button class="btn btn-secondary mb-2" onclick="aiDataLabeling()">AI数据标注</button>
+                <div id="labelList" class="mb-2">
+                    <!-- 标签列表将在这里动态生成 -->
+                </div>
+                <button class="btn btn-info mb-2" onclick="addLabel()">添加标签</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<nav class="navbar fixed-bottom navbar-light bg-light">
+    <div class="container-fluid">
+        <span id="fileInfo">当前文件：未选择</span>
+        <span id="wordCount">字数：0</span>
+        <span id="processedCount">已处理项目：0</span>
+        <button class="btn btn-sm btn-outline-secondary" id="toggleAIBtn"><i class="fas fa-comments"></i> 显示/隐藏AI助手
+        </button>
+    </div>
+</nav>
+
+<div id="aiChatWindow" class="card"
+     style="position: fixed; right: 20px; bottom: 60px; width: 300px; height: 400px; display: none;">
+    <div class="card-header">
+        AI助手
+        <button type="button" class="btn-close float-end" aria-label="Close" id="closeAIBtn"></button>
+    </div>
+    <div class="card-body" style="overflow-y: auto; height: 300px;" id="chatHistory"></div>
+    <div class="card-footer">
+        <div class="input-group">
+            <input type="text" class="form-control" placeholder="输入问题..." id="aiInput">
+            <button class="btn btn-primary" type="button" id="aiSendBtn"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>
+</div>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-6">
+            <h3>数据清洗维度</h3>
+            <ul id="cleaningDimensions" class="list-group">
+                {% for dimension in cleaning_dimensions %}
+                    <li class="list-group-item">
+                        <input type="checkbox" checked> {{ dimension }}
+                        <button class="btn btn-sm btn-danger float-end remove-dimension">删除</button>
+                    </li>
+                {% endfor %}
+            </ul>
+            <input type="text" id="newCleaningDimension" class="form-control mt-2" placeholder="添加新的清洗维度">
+            <button id="addCleaningDimension" class="btn btn-primary mt-2">添加</button>
+        </div>
+        <div class="col-md-6">
+            <h3>数据标注维度</h3>
+            <ul id="annotationDimensions" class="list-group">
+                {% for dimension in annotation_dimensions %}
+                    <li class="list-group-item">
+                        <input type="checkbox" checked> {{ dimension }}
+                        <button class="btn btn-sm btn-danger float-end remove-dimension">删除</button>
+                    </li>
+                {% endfor %}
+            </ul>
+            <input type="text" id="newAnnotationDimension" class="form-control mt-2" placeholder="添加新的标注维度">
+            <button id="addAnnotationDimension" class="btn btn-primary mt-2">添加</button>
+        </div>
+    </div>
+</div>
+
+<!-- 更新 Ace 编辑器的引用路径 -->
+<script src="{% static 'js/ace/ace.js' %}" type="text/javascript" charset="utf-8"></script>
+<script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        console.log('DOMContentLoaded event fired');
+        
+        // 初始化 Ace 编辑器
+        if (typeof ace !== 'undefined') {
+            var editor = ace.edit("editor");
+            editor.setTheme("ace/theme/monokai");
+            editor.session.setMode("ace/mode/text");
+            console.log('Ace editor initialized:', editor);
+
+            // 将 editor 赋值给全局变量，以便其他函数可以使用
+            window.editor = editor;
+        } else {
+            console.error('Ace editor is not loaded');
+        }
+
+        // 绑定事件监听器
+        document.getElementById('importBtn').addEventListener('click', importFile);
+        document.getElementById('exportBtn').addEventListener('click', exportFile);
+        document.getElementById('helpBtn').addEventListener('click', showHelp);
+        document.getElementById('toggleAIBtn').addEventListener('click', toggleAIChat);
+        document.getElementById('closeAIBtn').addEventListener('click', toggleAIChat);
+        document.getElementById('aiSendBtn').addEventListener('click', sendAIMessage);
+
+        // 初始化标签列表
+        updateLabelList();
+    });
+
+    // AI助手函数
+    function toggleAIChat() {
+        const aiChatWindow = document.getElementById('aiChatWindow');
+        if (aiChatWindow.style.display === 'none') {
+            aiChatWindow.style.display = 'block';
+            document.getElementById('chatHistory').innerHTML = '';
+            appendMessage('ai', '你好！我是AI助手，有什么可以帮助你的吗？');
+        } else {
+            aiChatWindow.style.display = 'none';
+        }
+    }
+
+    async function sendAIMessage() {
+        const input = document.getElementById('aiInput');
+        const message = input.value.trim();
+        if (message) {
+            appendMessage('user', message);
+            input.value = '';
+
+            try {
+                const response = await fetchWithCSRF('/chat/', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message})
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                appendMessage('ai', data.reply);
+
+            } catch (error) {
+                console.error('Error during chat communication:', error);
+                appendMessage('ai', '抱歉，我遇到了一些问题。请稍后再试。');
+            }
+        }
+    }
+
+    function appendMessage(sender, message) {
+        const chatHistory = document.getElementById('chatHistory');
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('chat-message', sender === 'user' ? 'user-message' : 'ai-message');
+        messageDiv.textContent = message;
+        chatHistory.appendChild(messageDiv);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+
+    function importFile() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.txt,.csv,.json';
+        input.onchange = async function (event) {
+            const file = event.target.files[0];
+            if (file) {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const response = await fetchWithCSRF('/upload-file/', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const content = await response.text();
+                    if (window.editor && typeof window.editor.setValue === 'function') {
+                        window.editor.setValue(content);
+                    } else {
+                        console.error('Editor is not initialized or setValue is not a function');
+                        alert('编辑器未正确初始化，请刷新页面后重试。');
+                    }
+                    document.getElementById('fileInfo').textContent = `当前文件：${file.name}`;
+                    updateWordCount();
+                } catch (error) {
+                    console.error('Error uploading file:', error);
+                    alert('上传文件时出错，请重试。');
+                }
+            }
+        };
+        input.click();
+    }
+
+    function exportFile() {
+        const content = window.editor.getValue();
+        const blob = new Blob([content], {type: 'text/plain'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'processed_data.txt';
+        a.click();
+    }
+
+    function showHelp() {
+        alert('使用说明：\n1. 点击"导入文件"按钮上传数据文件。\n2. 使用编辑器查看和编辑数据。\n3. 点击"AI数据清洗"或"AI数据标注"进行处理。\n4. 处理完成后，点击"导出文件"保存结果。');
+    }
+
+    function updateWordCount() {
+        const content = window.editor.getValue();
+        const wordCount = content.trim().split(/\s+/).length;
+        document.getElementById('wordCount').textContent = `字数：${wordCount}`;
+    }
+
+    function updateLabelList() {
+        // 这里可以添加标签列表的更新逻辑
+    }
+
+    function addLabel() {
+        // 这里可以添加新增标签的逻辑
+    }
+
+    async function aiDataCleaning() {
+        showLoader();
+        const content = window.editor.getValue();
+        if (!content) {
+            alert('请先导入输入数据');
+            hideLoader();
+            return;
+        }
+
+        const dimensions = getSelectedDimensions('cleaningDimensions');
+
+        try {
+            const response = await fetchWithCSRF('/process-file/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({process_type: 'clean', content: content, dimensions: dimensions})
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            window.editor.setValue(result.result);
+            updateWordCount();
+            alert('数据清洗完成');
+        } catch (error) {
+            console.error('Error during AI data cleaning:', error);
+            alert('数据清洗过程中出错，请重试。');
+        }
+        hideLoader();
+    }
+
+    async function aiDataLabeling() {
+        showLoader();
+        const content = window.editor.getValue();
+        if (!content) {
+            alert('请先导入或输入数据');
+            hideLoader();
+            return;
+        }
+
+        const dimensions = getSelectedDimensions('annotationDimensions');
+
+        try {
+            const response = await fetchWithCSRF('/process-file/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({process_type: 'annotate', content: content, dimensions: dimensions})
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            window.editor.setValue(result.result);
+            updateWordCount();
+            alert('数据标注完成');
+        } catch (error) {
+            console.error('Error during AI data labeling:', error);
+            alert('数据标注过程中出错，请重试。');
+        }
+        hideLoader();
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    function showLoader() {
+        document.getElementById('loader').style.display = 'block';
+    }
+
+    function hideLoader() {
+        document.getElementById('loader').style.display = 'none';
+    }
+
+    // 添加新的维度
+    function addDimension(listId, inputId) {
+        const list = document.getElementById(listId);
+        const input = document.getElementById(inputId);
+        const newDimension = input.value.trim();
+        if (newDimension) {
+            const li = document.createElement('li');
+            li.className = 'list-group-item';
+            li.innerHTML = `
+                    <input type="checkbox" checked> ${newDimension}
+                    <button class="btn btn-sm btn-danger float-end remove-dimension">删除</button>
+                `;
+            list.appendChild(li);
+            input.value = '';
+        }
+    }
+
+    // 删除维度
+    function removeDimension(event) {
+        if (event.target.classList.contains('remove-dimension')) {
+            event.target.closest('li').remove();
+        }
+    }
+
+    // 获取选中的维度
+    function getSelectedDimensions(listId) {
+        const list = document.getElementById(listId);
+        return Array.from(list.querySelectorAll('li'))
+            .filter(li => li.querySelector('input[type="checkbox"]').checked)
+            .map(li => li.textContent.trim());
+    }
+
+    document.getElementById('addCleaningDimension').addEventListener('click', () => addDimension('cleaningDimensions', 'newCleaningDimension'));
+    document.getElementById('addAnnotationDimension').addEventListener('click', () => addDimension('annotationDimensions', 'newAnnotationDimension'));
+    document.getElementById('cleaningDimensions').addEventListener('click', removeDimension);
+    document.getElementById('annotationDimensions').addEventListener('click', removeDimension);
+
+    console.log('DOM fully loaded');
+    console.log('Ace editor object:', typeof ace !== 'undefined' ? ace : 'Not loaded');
+    console.log('Editor element:', document.getElementById('editor'));
+
+    function fetchWithCSRF(url, options = {}) {
+        const csrftoken = getCookie('csrftoken');
+        return fetch(url, {
+            ...options,
+            headers: {
+                ...options.headers,
+                'X-CSRFToken': csrftoken
+            },
+            credentials: 'same-origin'
+        });
+    }
+</script>
+</body>
+</html>

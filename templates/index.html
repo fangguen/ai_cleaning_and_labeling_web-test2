@@ -1,0 +1,300 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    {% csrf_token %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI数据清洗与标注系统</title>
+    
+    <!-- 基础 CSS -->
+    <link href="{% static 'css/bootstrap.min.css' %}" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/all.min.css' %}">
+
+    <!-- Markdown 渲染 -->
+    <script src="{% static 'js/marked.min.js' %}"></script>
+    <script src="{% static 'js  /purify.min.js' %}"></script>
+    
+    <!-- GitHub Markdown CSS -->
+    <link rel="stylesheet" href="{% static 'css/github-markdown.min.css' %}">
+    
+    <!-- Highlight.js 代码高亮 -->
+    <link rel="stylesheet" href="{% static 'css/github-dark.min.css' %}">
+    <script src="{% static 'js/highlight.min.js' %}"></script>
+    
+    <!-- KaTeX 数学公式 -->
+    <link rel="stylesheet" href="{% static 'css/katex.min.css' %}">
+    <script defer src="{% static 'js/katex.min.js' %}"></script>
+    <script defer src="{% static 'js/auto-render.min.js' %}"></script>
+    
+    <!-- 自定义样式 -->
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#"><i class="fas fa-robot mr-2"></i>AI数据处理系统</a>
+            <div class="nav-buttons">
+                <button class="btn btn-light me-2" id="apiConfigBtn">
+                    <i class="fas fa-cog mr-2"></i>API配置
+                </button>
+                <button class="btn btn-light" id="instructionsBtn">
+                    <i class="fas fa-question-circle mr-2"></i>使用说明
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-6">
+                <h2><i class="fas fa-upload mr-2"></i>数据上传</h2>
+                <form id="uploadForm">
+                    <div class="mb-3">
+                        <label class="form-label">选择文件(.txt 或 .json)</label>
+                        <div class="custom-file">
+                            <input type="file" class="form-control" id="fileInput" accept=".txt,.json">
+                            <label class="custom-file-label" id="fileLabel" for="fileInput">未选择文件</label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">处理类型</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="processType" id="cleaningRadio" value="cleaning" checked>
+                            <label class="form-check-label" for="cleaningRadio">数据清洗</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="processType" id="labelingRadio" value="labeling">
+                            <label class="form-check-label" for="labelingRadio">数据标注</label>
+                        </div>
+                    </div>
+                    <button type="button" id="processButton" class="btn btn-primary">
+                        开始处理
+                    </button>
+                </form>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-tasks me-2"></i>处理维度</h5>
+                        <button class="btn btn-primary btn-sm" id="addDimensionBtn">
+                            <i class="fas fa-plus me-1"></i>添加维��
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="cleaningDimensions" class="dimension-section">
+                            <h6 class="dimension-type-title">数据清洗维度</h6>
+                            <div class="dimensions-list">
+                                <!-- 维度将通过JS动态添加 -->
+                            </div>
+                        </div>
+                        
+                        <div id="labelingDimensions" class="dimension-section">
+                            <h6 class="dimension-type-title">数据标注维度</h6>
+                            <div class="dimensions-list">
+                                <!-- 维度将通过JS动态添加 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <h3><i class="fas fa-file-alt mr-2"></i>原始数据</h3>
+                <textarea id="originalData" class="form-control" rows="10"></textarea>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <!-- ... 其他内容 ... -->
+                        
+                        <!-- 在处理结果区域添加导出按钮 -->
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="card-title">处理结果</h5>
+                            <button class="btn btn-primary" onclick="window.fileProcessor.exportProcessedData()">
+                                <i class="fas fa-download"></i> 导出结果
+                            </button>
+                        </div>
+                        <textarea id="processedData" class="form-control" rows="10" readonly></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <h3><i class="fas fa-table mr-2"></i>处理结果详情</h3>
+                <div class="table-responsive">
+                    <table id="resultTable" class="table table-bordered">
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI聊天小窗 -->
+    <div id="chatContainer" class="chat-container minimized">
+        <div class="chat-header">
+            <span>AI 助手</span>
+            <div class="chat-controls">
+                <span id="tokenCount" class="token-count">0/3072 tokens</span>
+                <button id="exportChatBtn" class="btn btn-sm btn-outline-light me-2" title="导出聊天记">
+                    <i class="fas fa-download"></i>
+                </button>
+                <button id="clearChatBtn" class="btn btn-sm btn-outline-light me-2" title="清除聊天记录">
+                    <i class="fas fa-trash"></i>
+                </button>
+                <button id="toggleChatBtn" class="btn btn-sm btn-outline-light">
+                    <i class="fas fa-minus"></i>
+                </button>
+            </div>
+        </div>
+        <div class="chat-messages"></div>
+        <div class="chat-input">
+            <textarea class="message-input" placeholder="输入消息，按Enter发送..."></textarea>
+            <button class="send-button">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- 使用说明模态框 -->
+    <div class="modal fade" id="instructionsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-info-circle mr-2"></i>使用说明</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- 这里添加使用说明内容 -->
+                    <p><i class="fas fa-file-upload mr-2"></i>1. 选择要处理的文件（.txt 或 .json 格式）。</p>
+                    <p><i class="fas fa-cogs mr-2"></i>2. 选择处理类型（数据清洗或数据标注）。</p>
+                    <p><i class="fas fa-list-ul mr-2"></i>3. 根据需要添加或删除处理维度。</p>
+                    <p><i class="fas fa-play-circle mr-2"></i>4. 点击"开始处理"按开始处理数据。</p>
+                    <p><i class="fas fa-eye mr-2"></i>5. 处理完成后，可以在"处理结果"区域查看结果，并下载处理后数据。</p>
+                    <p><i class="fas fa-robot mr-2"></i>6. 如有问题，可以使用右下角的 AI 助手进行咨询。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API配置模态框 -->
+    <div class="modal fade" id="apiConfigModal" tabindex="-1" aria-labelledby="apiConfigModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="apiConfigModalLabel">API配置</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="apiConfigForm">
+                        <div class="mb-3">
+                            <label for="serviceType" class="form-label">服务类型</label>
+                            <select class="form-select" id="serviceType">
+                                <option value="openai">OpenAI</option>
+                                <option value="zhipu">智谱AI</option>
+                                <option value="deepseek">Deepseek</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="apiKey" class="form-label">API密钥</label>
+                            <input type="password" class="form-control" id="apiKey" required>
+                        </div>
+                        <div class="mb-3" id="baseUrlGroup">
+                            <label for="baseUrl" class="form-label">
+                                Base URL(仅用于OpenAI,可选)
+                                <small class="text-muted">默认: gptai.cc<span id="defaultBaseUrl"></span></small>
+                            </label>
+                            <input type="text" class="form-control" id="baseUrl">
+                        </div>
+                        <div class="mb-3">
+                            <label for="systemPrompt" class="form-label">系统提示词（可选）</label>
+                            <textarea class="form-control" id="systemPrompt" rows="3" placeholder="请输入系统提示词，留空则使用默认提示词"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="saveApiConfig">保存配置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 首先加载第三方库 -->
+    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'js/marked.min.js' %}"></script>
+    <script src="{% static 'js/purify.min.js' %}"></script>
+
+    <!-- 最后加载自定义脚本 -->
+    <script src="{% static 'js/custom.js' %}"></script>
+
+    <!-- 在其他模态框后添加 -->
+    <div class="modal fade" id="addDimensionModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">添加维度</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addDimensionForm">
+                        <div class="mb-3">
+                            <label for="dimensionType" class="form-label">维度类型</label>
+                            <select class="form-select" id="dimensionType">
+                                <option value="cleaning">数据清洗</option>
+                                <option value="labeling">数据标注</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="dimensionName" class="form-label">维度名称</label>
+                            <input type="text" class="form-control" id="dimensionName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="dimensionDescription" class="form-label">维度描述（可选）</label>
+                            <textarea class="form-control" id="dimensionDescription" rows="3"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="addDimensionSubmitBtn">添加</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 在初始化脚本之前添加 -->
+    <script>
+        // 初始化维度数据，添加错误处理
+        window.initialData = {
+            cleaningDimensions: JSON.parse('{{ cleaning_dimensions|escapejs }}' || '[]'),
+            labelingDimensions: JSON.parse('{{ labeling_dimensions|escapejs }}' || '[]')
+        };
+    </script>
+
+    <!--  body 末尾添加 -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="errorToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header bg-danger text-white">
+                <strong class="me-auto">错误</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body"></div>
+        </div>
+        
+        <!-- 添加成功提示 toast -->
+        <div id="successToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header bg-success text-white">
+                <strong class="me-auto">成功</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body"></div>
+        </div>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,60 @@
+/* 定义主要字体 */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+    font-size: 16px;
+    line-height: 1.5;
+    color: #333;
+}
+
+/* 标题字体 */
+h1, h2, h3, h4, h5, h6 {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-weight: 600;
+    line-height: 1.2;
+    color: #2c3e50;
+}
+
+/* 特定元素的字体样式 */
+.navbar-brand {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.btn {
+    font-weight: 500;
+}
+
+.form-label {
+    font-weight: 500;
+}
+
+#chatContainer {
+    font-size: 0.9rem;
+}
+
+.chat-header {
+    font-weight: 600;
+}
+
+.message {
+    font-size: 0.95rem;
+}
+
+/* 调整字体大小以确保响应式设计 */
+@media (max-width: 768px) {
+    body {
+        font-size: 14px;
+    }
+
+    h1 {
+        font-size: 2rem;
+    }
+
+    h2 {
+        font-size: 1.75rem;
+    }
+
+    h3 {
+        font-size: 1.5rem;
+    }
+}
