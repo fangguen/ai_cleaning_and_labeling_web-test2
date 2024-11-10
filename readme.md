@@ -22,8 +22,7 @@
 1. 克隆项目
 
 bash
-git clone https://github.com/fangguen/ai_cleaning_and_labeling_web-test.git
-cd ai_cleaning_and_labeling_web-test
+git clone https://github.com/fangguen/ai_cleaning_and_labeling_web-test2
 
 2. 创建虚拟环境
 
