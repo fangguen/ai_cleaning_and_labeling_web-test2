@@ -47,10 +47,11 @@ bash
 pip install -r requirements.txt
 
 
-5. 初始化数据库
+5. 初始化数据库和创建管理员
 
 bash
 python manage.py migrate
+python manage.py createsuperuser
 
 
 6. 启动服务器
