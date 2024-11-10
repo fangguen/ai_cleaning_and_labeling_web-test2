@@ -176,8 +176,8 @@ class TextProcessor:
                         return results
                     raise ValueError("无法解析任何 JSON 对象")
                 except Exception as e:
-                    logger.error(f"JSON 解析失败: {str(e)}")
-                    logger.debug(f"原始响应:\n{response}")
+                    logger.error(f"JSON 解析失败直接返回结果: {str(e)}")
+                    return response
                     raise
 
     def get_cached_result(self, processing_key: str) -> Optional[Dict]:
